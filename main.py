@@ -242,14 +242,11 @@ class TitlebarPlugin:
             "empty_text": self._tr("不显示图标", "No icons shown"),
         }
 
-    def _build_preview_card(self, items):
+    def _build_preview_card(self, card_id, items, order, label):
         return {
-            "id": "titlebar-preview",
+            "id": card_id,
             "title": self._tr("预览", "Preview"),
-            "items": [
-                self._build_strip(items, MARKDOWN_ORDER, "Markdown"),
-                self._build_strip(items, SOURCE_ORDER, self._tr("源码模式", "Source")),
-            ],
+            "items": [self._build_strip(items, order, label)],
         }
 
     def _build_rows(self, items):
@@ -300,8 +297,10 @@ class TitlebarPlugin:
         title = self._tr("顶栏图标", "Titlebar Icons")
         cards = []
         if self.item_icons:
-            cards.append(self._build_preview_card(items))
+            cards.append(self._build_preview_card("titlebar-markdown-preview", items, MARKDOWN_ORDER, "Markdown"))
         cards.append({"id": "titlebar-markdown", "title": "Markdown", "items": self._build_rows(markdown_items)})
+        if self.item_icons:
+            cards.append(self._build_preview_card("titlebar-source-preview", items, SOURCE_ORDER, self._tr("源码模式", "Source")))
         source_rows = self._build_rows(source_items) + [actions]
         cards.append({"id": "titlebar-source", "title": self._tr("源码模式", "Source Mode"), "items": source_rows})
         return {"title": title, "status": status, "cards": cards}
