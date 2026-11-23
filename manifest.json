@@ -2,6 +2,7 @@
   "app": "blockmd",
   "schema_version": 1,
   "id": "block-titlebar",
+  "category": "appearance",
   "name": {
     "zh": "顶栏图标",
     "en": "Titlebar Icons"
