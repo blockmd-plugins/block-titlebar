@@ -8,4 +8,4 @@
 - **Instant save**: Changes take effect immediately from the plugin settings page.
 - **Safe restore**: Page Actions stays pinned, plus a one-click Show All button.
 
-**Install**: Open Block Settings -> App Store and search **Titlebar Icons**, or enter `eachann1024/block-titlebar`.
+**Install**: Open Block Settings -> App Store and search **Titlebar Icons**, or enter `blockmd-plugins/block-titlebar`.
