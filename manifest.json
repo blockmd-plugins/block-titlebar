@@ -21,20 +21,7 @@
       "main.py"
     ]
   },
-  "permissions": [
-    "storage",
-    "ui:titlebar"
-  ],
-  "permission_reasons": {
-    "storage": {
-      "zh": "保存已隐藏的顶栏图标列表配置",
-      "en": "Save the list of hidden titlebar icons"
-    },
-    "ui:titlebar": {
-      "zh": "读取顶栏图标项并控制各个按钮的显示与隐藏",
-      "en": "Read titlebar items and control visibility of individual buttons"
-    }
-  },
+  "permissions": [],
   "surfaces": [
     "settings_page"
   ],
