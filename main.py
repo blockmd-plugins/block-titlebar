@@ -19,7 +19,7 @@ CHINESE_TEXT = re.compile(r"[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]")
 
 BUILTIN_SLOTS = (
     ("feedback", "反馈", "Feedback", False),
-    ("ai", "AI 助手", "AI Assistant", False),
+    ("ai", "AI Agent", "AI Agent", False),
     ("send_all", "统一发送批注", "Send All Annotations", False),
     ("wrap", "自动换行", "Word Wrap", False),
     ("zoom", "缩放", "Zoom", False),
