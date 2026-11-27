@@ -7,7 +7,7 @@
     "zh": "顶栏图标",
     "en": "Titlebar Icons"
   },
-  "version": "1.0.1",
+  "version": "1.1.0",
   "author": "Block Community",
   "repo": "blockmd-plugins/block-titlebar",
   "summary": {
