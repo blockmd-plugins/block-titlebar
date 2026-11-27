@@ -11,15 +11,11 @@
   "author": "Block Community",
   "repo": "blockmd-plugins/block-titlebar",
   "summary": {
-    "zh": "自定义顶栏右上角显示的图标，隐藏不需要的按钮",
-    "en": "Choose which icons appear in the top-right titlebar"
+    "zh": "像整理浏览器工具栏一样，收起右上角用不上的按钮，让顶栏更清爽",
+    "en": "Declutter the top-right titlebar like a browser toolbar by hiding buttons you rarely use"
   },
   "entry": {
-    "command": [
-      "python3",
-      "-u",
-      "main.py"
-    ]
+    "js": "main.js"
   },
   "permissions": [
     "storage",
@@ -27,17 +23,20 @@
   ],
   "permission_reasons": {
     "storage": {
-      "zh": "保存已隐藏的顶栏图标列表配置",
-      "en": "Save the list of hidden titlebar icons"
+      "zh": "记住你隐藏了哪些顶栏按钮",
+      "en": "Remember which titlebar buttons you chose to hide"
     },
     "ui:titlebar": {
-      "zh": "读取顶栏图标项并控制各个按钮的显示与隐藏",
-      "en": "Read titlebar items and control visibility of individual buttons"
+      "zh": "读取右上角按钮列表并按你的开关显示或隐藏它们",
+      "en": "Read the top-right buttons and show or hide them per your settings"
     }
   },
   "surfaces": [
     "settings_page"
   ],
+  "contributes": {
+    "titlebar_manager": true
+  },
   "icon": {
     "view_box": "0 0 24 24",
     "fill_paths": [
