@@ -114,6 +114,14 @@ function normalizePreview(rawPreview) {
   return icons;
 }
 
+function displayText(text, fallback) {
+  const value = String(text || '').trim();
+  if (!value || (isEn() && CHINESE_TEXT.test(value))) {
+    return fallback;
+  }
+  return value;
+}
+
 function normalizeItems(rawItems) {
   const items = [];
   for (const raw of rawItems) {
@@ -131,13 +139,13 @@ function normalizeItems(rawItems) {
     if (preview === false) {
       return null;
     }
-    const locked = Boolean(raw.locked);
-    const label = String(raw.label || slotId);
+    const locked = raw.locked === true;
+    const label = displayText(raw.label, slotId.replace(/^plugin:/, ''));
     const item = {
       id: slotId,
       label,
       locked,
-      hidden: locked ? false : Boolean(raw.hidden),
+      hidden: locked ? false : raw.hidden === true,
       group: typeof raw.group === 'string' ? raw.group.trim() : '',
     };
     if (isPlainObject(raw.icon)) {
@@ -167,7 +175,7 @@ function normalizeGroups(rawGroups) {
     if (!id) {
       return { groups: null, valid: false };
     }
-    const label = String(raw.label || id);
+    const label = displayText(raw.label, id);
     const order = [];
     for (const rawId of raw.order) {
       if (typeof rawId !== 'string') {
@@ -403,6 +411,7 @@ function buildPage(state, status = '') {
   }
 
   const cards = [];
+  let lastSettingsCard = null;
   for (const group of groups) {
     if (itemIcons && group.order.length > 0) {
       cards.push({
@@ -413,24 +422,25 @@ function buildPage(state, status = '') {
     }
     const groupItems = itemsByGroup.get(group.id) || [];
     if (groupItems.length > 0) {
-      cards.push({
+      lastSettingsCard = {
         id: `titlebar-${group.id}`,
         title: group.label,
         items: buildRows(groupItems),
-      });
+      };
+      cards.push(lastSettingsCard);
     }
   }
   if (ungrouped.length > 0) {
-    cards.push({
+    lastSettingsCard = {
       id: 'titlebar-other',
       title: tr('其他', 'Other'),
       items: buildRows(ungrouped),
-    });
+    };
+    cards.push(lastSettingsCard);
   }
 
-  const settingsCards = cards.filter((c) => !c.id.endsWith('-preview'));
-  if (settingsCards.length > 0) {
-    settingsCards[settingsCards.length - 1].items.push(actions);
+  if (lastSettingsCard) {
+    lastSettingsCard.items.push(actions);
   } else {
     cards.push({ id: 'titlebar-items', title, items: [actions] });
   }
