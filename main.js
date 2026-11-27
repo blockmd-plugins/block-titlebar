@@ -14,7 +14,6 @@ const BUILTIN_SLOTS = [
   ['send_all', '统一发送批注', 'Send All Annotations', false],
   ['wrap', '自动换行', 'Word Wrap', false],
   ['zoom', '缩放', 'Zoom', false],
-  ['reveal', '在文件夹中显示', 'Reveal in Folder', false],
   ['more', '页面操作', 'Page Actions', true],
 ];
 
@@ -94,15 +93,23 @@ function fallbackItems() {
   }));
 }
 
+function protocolErrorText() {
+  return tr('协议错误：宿主返回了无效的顶栏数据', 'Protocol error: host returned invalid titlebar data');
+}
+
 function normalizePreview(rawPreview) {
-  if (!Array.isArray(rawPreview)) {
+  if (rawPreview === undefined || rawPreview === null) {
     return null;
+  }
+  if (!Array.isArray(rawPreview)) {
+    return false;
   }
   const icons = [];
   for (const rawIcon of rawPreview) {
-    if (isPlainObject(rawIcon)) {
-      icons.push({ ...rawIcon });
+    if (!isPlainObject(rawIcon)) {
+      return false;
     }
+    icons.push({ ...rawIcon });
   }
   return icons;
 }
@@ -110,12 +117,19 @@ function normalizePreview(rawPreview) {
 function normalizeItems(rawItems) {
   const items = [];
   for (const raw of rawItems) {
-    if (!isPlainObject(raw)) {
-      continue;
+    if (!isPlainObject(raw) || typeof raw.id !== 'string') {
+      return null;
     }
-    const slotId = String(raw.id || '').trim();
+    const slotId = raw.id.trim();
     if (!slotId) {
-      continue;
+      return null;
+    }
+    if (raw.icon !== undefined && raw.icon !== null && !isPlainObject(raw.icon)) {
+      return null;
+    }
+    const preview = normalizePreview(raw.preview);
+    if (preview === false) {
+      return null;
     }
     const locked = Boolean(raw.locked);
     const label = String(raw.label || slotId);
@@ -129,7 +143,6 @@ function normalizeItems(rawItems) {
     if (isPlainObject(raw.icon)) {
       item.icon = { ...raw.icon };
     }
-    const preview = normalizePreview(raw.preview);
     if (preview !== null) {
       item.preview = preview;
     }
@@ -139,34 +152,59 @@ function normalizeItems(rawItems) {
 }
 
 function normalizeGroups(rawGroups) {
+  if (rawGroups === undefined || rawGroups === null) {
+    return { groups: null, valid: true };
+  }
   if (!Array.isArray(rawGroups)) {
-    return null;
+    return { groups: null, valid: false };
   }
   const groups = [];
   for (const raw of rawGroups) {
-    if (!isPlainObject(raw)) {
-      continue;
+    if (!isPlainObject(raw) || typeof raw.id !== 'string' || !Array.isArray(raw.order)) {
+      return { groups: null, valid: false };
     }
-    const id = String(raw.id || '').trim();
+    const id = raw.id.trim();
     if (!id) {
-      continue;
+      return { groups: null, valid: false };
     }
     const label = String(raw.label || id);
     const order = [];
-    if (Array.isArray(raw.order)) {
-      for (const rawId of raw.order) {
-        if (typeof rawId !== 'string') {
-          continue;
-        }
-        const slotId = rawId.trim();
-        if (slotId) {
-          order.push(slotId);
-        }
+    for (const rawId of raw.order) {
+      if (typeof rawId !== 'string') {
+        return { groups: null, valid: false };
+      }
+      const slotId = rawId.trim();
+      if (slotId) {
+        order.push(slotId);
       }
     }
     groups.push({ id, label, order });
   }
-  return groups.length > 0 ? groups : null;
+  return { groups: groups.length > 0 ? groups : null, valid: true };
+}
+
+function parseTitlebarResponse(res, requireItems = true) {
+  if (!isPlainObject(res)) {
+    return { items: [], groups: null, error: protocolErrorText() };
+  }
+  if (!Object.prototype.hasOwnProperty.call(res, 'items')) {
+    if (!requireItems) {
+      return null;
+    }
+    return { items: [], groups: null, error: protocolErrorText() };
+  }
+  if (!Array.isArray(res.items)) {
+    return { items: [], groups: null, error: protocolErrorText() };
+  }
+  const items = normalizeItems(res.items);
+  if (items === null) {
+    return { items: [], groups: null, error: protocolErrorText() };
+  }
+  const { groups, valid } = normalizeGroups(res.groups);
+  if (!valid) {
+    return { items: [], groups: null, error: protocolErrorText() };
+  }
+  return { items, groups, error: '' };
 }
 
 function getTitlebarState() {
@@ -175,18 +213,11 @@ function getTitlebarState() {
     res = callHost('host.titlebar.get_items', {});
   } catch (err) {
     if (err && err.code === -32601) {
-      return { items: fallbackItems(), groups: null };
+      return { items: fallbackItems(), groups: null, error: '' };
     }
     throw err;
   }
-  const rawItems = isPlainObject(res) ? res.items : null;
-  if (Array.isArray(rawItems)) {
-    return {
-      items: normalizeItems(rawItems),
-      groups: normalizeGroups(res.groups),
-    };
-  }
-  return { items: fallbackItems(), groups: null };
+  return parseTitlebarResponse(res, true);
 }
 
 function setHidden(hiddenIds, lockedIds = null) {
@@ -195,12 +226,7 @@ function setHidden(hiddenIds, lockedIds = null) {
   let updated = null;
   try {
     const res = callHost('host.titlebar.set_hidden', { hidden: cleaned });
-    if (isPlainObject(res) && Array.isArray(res.items)) {
-      updated = {
-        items: normalizeItems(res.items),
-        groups: normalizeGroups(res.groups),
-      };
-    }
+    updated = parseTitlebarResponse(res, false);
   } catch (err) {
     if (!err || err.code !== -32601) {
       throw err;
@@ -208,9 +234,12 @@ function setHidden(hiddenIds, lockedIds = null) {
   }
   callHost('host.storage.set', { key: STORAGE_KEY, value: cleaned });
   if (updated !== null) {
+    if (updated.error) {
+      return updated;
+    }
     if (updated.groups === null) {
       const latest = getTitlebarState();
-      if (latest.groups !== null) {
+      if (latest.error || latest.groups !== null) {
         return latest;
       }
     }
@@ -308,6 +337,26 @@ function buildRows(items) {
 }
 
 function buildPage(state, status = '') {
+  const errorStatus = state && typeof state.error === 'string' ? state.error.trim() : '';
+  const title = tr('顶栏图标', 'Titlebar Icons');
+  if (errorStatus) {
+    return {
+      title,
+      status: errorStatus,
+      cards: [
+        {
+          id: 'titlebar-error',
+          title,
+          items: [
+            {
+              kind: 'kv',
+              rows: [{ label: tr('状态', 'Status'), value: errorStatus }],
+            },
+          ],
+        },
+      ],
+    };
+  }
   const items = Array.isArray(state && state.items) ? state.items : [];
   const groups = Array.isArray(state && state.groups) ? state.groups : null;
   const actions = {
@@ -320,7 +369,6 @@ function buildPage(state, status = '') {
       },
     ],
   };
-  const title = tr('顶栏图标', 'Titlebar Icons');
 
   // Older hosts without `groups` degrade to a single flat switch list without preview.
   if (!groups || groups.length === 0) {
@@ -414,10 +462,14 @@ function handle(method, params) {
       cachedHidden = [...savedHidden];
       try {
         const res = callHost('host.titlebar.set_hidden', { hidden: savedHidden });
-        if (isPlainObject(res) && Array.isArray(res.items)) {
-          const items = normalizeItems(res.items);
-          const lockedIds = new Set(items.filter(isLocked).map((item) => item.id));
-          const filtered = cleanHidden(savedHidden, lockedIds);
+        const parsed = parseTitlebarResponse(res, false);
+        if (parsed && !parsed.error) {
+          const manageableIds = new Set(
+            parsed.items.filter((item) => !isLocked(item)).map((item) => item.id),
+          );
+          const filtered = savedHidden.filter(
+            (slotId) => manageableIds.has(slotId) || slotId.startsWith('plugin:'),
+          );
           if (filtered.length !== savedHidden.length) {
             savedHidden = filtered;
             cachedHidden = [...filtered];
@@ -491,6 +543,15 @@ function handle(method, params) {
     const actionId = String(params.action_id || '');
     if (actionId === 'show_all') {
       const state = setHidden([]);
+      if (state.error) {
+        return {
+          ok: false,
+          tone: 'danger',
+          values: currentValues(state.items),
+          page: buildPage(state),
+          status: state.error,
+        };
+      }
       const status = tr('已显示全部顶栏图标', 'All titlebar icons are now shown');
       return {
         ok: true,
@@ -501,10 +562,10 @@ function handle(method, params) {
       };
     }
     const state = getTitlebarState();
-    const status = tr('未知操作', 'Unknown action');
+    const status = state.error || tr('未知操作', 'Unknown action');
     return {
       ok: false,
-      tone: 'warning',
+      tone: state.error ? 'danger' : 'warning',
       values: currentValues(state.items),
       page: buildPage(state),
       status,
